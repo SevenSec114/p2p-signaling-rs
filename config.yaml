@@ -1,0 +1,2 @@
+# Default configuration
+sig_port: 8090  # signaling server's port
