@@ -91,8 +91,8 @@ impl Client {
 fn main() {
     let pool = Rc::new(RefCell::new(HashMap::<String, Sender>::new()));
 
-    let content = std::fs::read_to_string("config.yaml").expect("read config");
-    let config: Config = serde_yaml::from_str(&content).expect("parse config");
+    let content = std::fs::read_to_string("config.yaml").expect("cannot find config.yaml");
+    let config: Config = serde_yaml::from_str(&content).expect("not valid yaml file");
 
     let ws = ws::Builder::new()
         .build({
