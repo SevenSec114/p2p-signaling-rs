@@ -31,14 +31,30 @@ impl Handler for Client {
         // register
         if let Some(id) = v.get("register").and_then(|x| x.as_str()) {
             let id = id.to_string();
-            self.id = Some(id.clone());
+            let force = v.get("force").and_then(|x| x.as_bool()).unwrap_or(false);
 
-            let old_sender = self.pool.borrow().get(&id).cloned();
-            if let Some(sender) = old_sender {
-                let _ = sender.close(CloseCode::Normal);
+            if self.pool.borrow().contains_key(&id) && !force {
+                let _ = self.out.send(format!("id `{}` taken", id));
+                return Ok(());
             }
 
+            if force {
+                if let Some(sender) = self.pool.borrow().get(&id).cloned() {
+                    let _ = sender.close(CloseCode::Normal);
+                }
+            }
+
+            self.id = Some(id.clone());
             self.pool.borrow_mut().insert(id, self.out.clone());
+            return Ok(());
+        }
+
+        // query registration status
+        if let Some(id) = v.get("query").and_then(|x| x.as_str()) {
+            let registered = self.pool.borrow().contains_key(id);
+            let _ = self
+                .out
+                .send(format!(r#"{{"id":"{}","registered":{}}}"#, id, registered));
             return Ok(());
         }
 
