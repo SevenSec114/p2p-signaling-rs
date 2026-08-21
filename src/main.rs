@@ -99,7 +99,14 @@ impl Handler for Client {
 impl Client {
     fn cleanup(&self) {
         if let Some(ref id) = self.id {
-            self.pool.borrow_mut().remove(id);
+            let mut pool = self.pool.borrow_mut();
+            // only remove the entry if it's still the same sender
+            let mine = pool
+                .get(id)
+                .is_some_and(|s| s.connection_id() == self.out.connection_id());
+            if mine {
+                pool.remove(id);
+            }
         }
     }
 }
