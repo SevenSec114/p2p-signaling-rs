@@ -20,7 +20,7 @@ struct Client {
 
 impl Handler for Client {
     fn on_open(&mut self, _: Handshake) -> Result<()> {
-        eprintln!("[open] conn={}", self.out.connection_id());
+        println!("[open] conn={}", self.out.connection_id());
         self.out.timeout(TICK_MS, TICK)
     }
 
@@ -29,7 +29,7 @@ impl Handler for Client {
             return Ok(());
         }
         if self.last_seen.elapsed().as_secs() > IDLE_SECS {
-            eprintln!(
+            println!(
                 "[idle] conn={} silent for {}s, closing",
                 self.out.connection_id(),
                 self.last_seen.elapsed().as_secs()
@@ -52,7 +52,7 @@ impl Handler for Client {
         let v: serde_json::Value = match serde_json::from_str(&text) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!(
+                println!(
                     "[error] conn={} invalid_json: {e} | {}",
                     self.out.connection_id(),
                     text
@@ -74,7 +74,7 @@ impl Handler for Client {
             let force = v.get("force").and_then(|x| x.as_bool()).unwrap_or(false);
 
             if self.pool.borrow().contains_key(&id) && !force {
-                eprintln!(
+                println!(
                     "[reg] {id} denied: id_taken (conn={})",
                     self.out.connection_id()
                 );
@@ -86,7 +86,7 @@ impl Handler for Client {
 
             if force {
                 if let Some(sender) = self.pool.borrow().get(&id).cloned() {
-                    eprintln!(
+                    println!(
                         "[kick] {id} conn={} replaced by conn={}",
                         sender.connection_id(),
                         self.out.connection_id()
@@ -98,7 +98,7 @@ impl Handler for Client {
             self.id = Some(id.clone());
             self.pool.borrow_mut().insert(id.clone(), self.out.clone());
             let online: Vec<String> = self.pool.borrow().keys().cloned().collect();
-            eprintln!(
+            println!(
                 "[reg] {id} conn={} online={} {online:?}",
                 self.out.connection_id(),
                 online.len()
@@ -109,7 +109,7 @@ impl Handler for Client {
         // query registration status
         if let Some(id) = v.get("query").and_then(|x| x.as_str()) {
             let registered = self.pool.borrow().contains_key(id);
-            eprintln!(
+            println!(
                 "[query] {id} -> registered={registered} (conn={})",
                 self.out.connection_id()
             );
@@ -123,7 +123,7 @@ impl Handler for Client {
         let from = match v.get("from").and_then(|x| x.as_str()) {
             Some(f) => f,
             None => {
-                eprintln!(
+                println!(
                     "[error] conn={} missing from | {text}",
                     self.out.connection_id()
                 );
@@ -136,7 +136,7 @@ impl Handler for Client {
         let to = match v.get("to").and_then(|x| x.as_str()) {
             Some(t) => t,
             None => {
-                eprintln!(
+                println!(
                     "[error] conn={} missing to | {text}",
                     self.out.connection_id()
                 );
@@ -149,7 +149,7 @@ impl Handler for Client {
         let kind = v.get("type").and_then(|x| x.as_str()).unwrap_or("-");
 
         if self.pool.borrow().get(from).is_none() {
-            eprintln!(
+            println!(
                 "[error] {from} unregistered (conn={})",
                 self.out.connection_id()
             );
@@ -159,10 +159,10 @@ impl Handler for Client {
             return Ok(());
         }
         if let Some(target) = self.pool.borrow().get(to).cloned() {
-            eprintln!("[fwd] {from} -> {to} type={kind} {}B", text.len());
+            println!("[fwd] {from} -> {to} type={kind} {}B", text.len());
             target.send(text)?;
         } else {
-            eprintln!("[fwd] {from} -> {to} type={kind} offline");
+            println!("[fwd] {from} -> {to} type={kind} offline");
             let _ = self
                 .out
                 .send(json!({ "error": "offline", "to": to }).to_string());
@@ -172,7 +172,7 @@ impl Handler for Client {
     }
 
     fn on_close(&mut self, code: CloseCode, reason: &str) {
-        eprintln!(
+        println!(
             "[close] conn={} code={code:?} reason={reason:?}",
             self.out.connection_id()
         );
@@ -180,7 +180,7 @@ impl Handler for Client {
     }
 
     fn on_error(&mut self, err: Error) {
-        eprintln!("[error] conn={} {err}", self.out.connection_id());
+        println!("[error] conn={} {err}", self.out.connection_id());
         self.cleanup();
     }
 }
@@ -196,7 +196,7 @@ impl Client {
             if mine {
                 pool.remove(id);
                 let online: Vec<String> = pool.keys().cloned().collect();
-                eprintln!(
+                println!(
                     "[off] {id} conn={} online={} {online:?}",
                     self.out.connection_id(),
                     online.len()
@@ -225,5 +225,5 @@ fn main() {
         .unwrap();
 
     ws.listen(format!("0.0.0.0:{}", config.sig_port)).unwrap();
-    eprintln!("Server listening on port {}", config.sig_port);
+    println!("Server listening on port {}", config.sig_port);
 }
