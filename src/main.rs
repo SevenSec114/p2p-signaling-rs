@@ -1,5 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
-use ws::{CloseCode, Error, Handler, Message, Result, Sender};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
+use ws::{CloseCode, Error, Handler, Handshake, Message, Result, Sender, util::Token};
+
+const TICK: Token = Token(1);
+const TICK_MS: u64 = 20_000;
+const IDLE_SECS: u64 = 30;
 
 #[derive(Debug, serde::Deserialize)]
 struct Config {
@@ -9,11 +13,29 @@ struct Config {
 struct Client {
     pool: Rc<RefCell<HashMap<String, Sender>>>,
     id: Option<String>,
+    last_seen: Instant,
     out: Sender,
 }
 
 impl Handler for Client {
+    fn on_open(&mut self, _: Handshake) -> Result<()> {
+        self.out.timeout(TICK_MS, TICK)
+    }
+
+    fn on_timeout(&mut self, event: Token) -> Result<()> {
+        if event != TICK {
+            return Ok(());
+        }
+        if self.last_seen.elapsed().as_secs() > IDLE_SECS {
+            self.cleanup();
+            return self.out.close(CloseCode::Away);
+        }
+        self.out.send(r#"{"ping":true}"#)?;
+        self.out.timeout(TICK_MS, TICK)
+    }
+
     fn on_message(&mut self, msg: Message) -> Result<()> {
+        self.last_seen = Instant::now();
         let text = match msg {
             Message::Text(t) => t,
             _ => return Ok(()),
@@ -27,6 +49,10 @@ impl Handler for Client {
                 return Ok(());
             }
         };
+
+        if v.get("pong").is_some() {
+            return Ok(());
+        }
 
         // register
         if let Some(id) = v.get("register").and_then(|x| x.as_str()) {
@@ -123,6 +149,7 @@ fn main() {
             move |out: Sender| Client {
                 pool: pool.clone(),
                 id: None,
+                last_seen: Instant::now(),
                 out,
             }
         })
