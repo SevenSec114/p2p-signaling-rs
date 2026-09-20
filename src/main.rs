@@ -1,3 +1,4 @@
+use serde_json::json;
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
 use ws::{CloseCode, Error, Handler, Handshake, Message, Result, Sender, util::Token};
 
@@ -45,7 +46,9 @@ impl Handler for Client {
         let v: serde_json::Value = match serde_json::from_str(&text) {
             Ok(v) => v,
             Err(_) => {
-                let _ = self.out.send("Invalid JSON");
+                let _ = self
+                    .out
+                    .send(json!({ "error": "invalid_json" }).to_string());
                 return Ok(());
             }
         };
@@ -60,7 +63,9 @@ impl Handler for Client {
             let force = v.get("force").and_then(|x| x.as_bool()).unwrap_or(false);
 
             if self.pool.borrow().contains_key(&id) && !force {
-                let _ = self.out.send(format!("id `{}` taken", id));
+                let _ = self
+                    .out
+                    .send(json!({ "error": "id_taken", "id": id }).to_string());
                 return Ok(());
             }
 
@@ -88,26 +93,34 @@ impl Handler for Client {
         let from = match v.get("from").and_then(|x| x.as_str()) {
             Some(f) => f,
             None => {
-                let _ = self.out.send("Missing `from`");
+                let _ = self
+                    .out
+                    .send(json!({ "error": "missing_field", "field": "from" }).to_string());
                 return Ok(());
             }
         };
         let to = match v.get("to").and_then(|x| x.as_str()) {
             Some(t) => t,
             None => {
-                let _ = self.out.send("Missing `to`");
+                let _ = self
+                    .out
+                    .send(json!({ "error": "missing_field", "field": "to" }).to_string());
                 return Ok(());
             }
         };
 
         if self.pool.borrow().get(from).is_none() {
-            let _ = self.out.send(format!("{} not registered", from));
+            let _ = self
+                .out
+                .send(json!({ "error": "unregistered", "from": from }).to_string());
             return Ok(());
         }
         if let Some(target) = self.pool.borrow().get(to).cloned() {
             target.send(text)?;
         } else {
-            let _ = self.out.send(format!("{} offline", to));
+            let _ = self
+                .out
+                .send(json!({ "error": "offline", "to": to }).to_string());
         }
 
         Ok(())
