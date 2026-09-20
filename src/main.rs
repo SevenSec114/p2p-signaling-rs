@@ -97,7 +97,7 @@ impl Handler for Client {
 
             self.id = Some(id.clone());
             self.pool.borrow_mut().insert(id.clone(), self.out.clone());
-            let online: Vec<&String> = self.pool.borrow().keys().collect();
+            let online: Vec<String> = self.pool.borrow().keys().cloned().collect();
             eprintln!(
                 "[reg] {id} conn={} online={} {online:?}",
                 self.out.connection_id(),
@@ -195,7 +195,7 @@ impl Client {
                 .is_some_and(|s| s.connection_id() == self.out.connection_id());
             if mine {
                 pool.remove(id);
-                let online: Vec<&String> = pool.keys().collect();
+                let online: Vec<String> = pool.keys().cloned().collect();
                 eprintln!(
                     "[off] {id} conn={} online={} {online:?}",
                     self.out.connection_id(),
